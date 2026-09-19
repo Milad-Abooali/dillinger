@@ -7,6 +7,8 @@ const lineNumberRendererRuleNames = [
     "code_block",
     "fence",
     "list_item_open",
+    "bullet_list_open",
+    "ordered_list_open",
 ] as const;
 
 function applyLegacyRendererRules(instance: MarkdownIt) {
@@ -16,7 +18,70 @@ function applyLegacyRendererRules(instance: MarkdownIt) {
         return self.renderToken(tokens, idx, options);
     };
 
+    instance.renderer.rules.td_open = (tokens, idx, options, env, self) => {
+        const token = tokens[idx];
+        const contentToken = tokens[idx + 1];
+
+        if (contentToken?.type === "inline") {
+            const direction = detectTextDirection(contentToken.content);
+
+            token.attrSet("dir", direction);
+            token.attrSet("style", `text-align: ${direction === "rtl" ? "right" : "left"}`);
+        }
+
+        return self.renderToken(tokens, idx, options);
+    };
+
+    instance.renderer.rules.th_open = (tokens, idx, options, env, self) => {
+        const token = tokens[idx];
+        const contentToken = tokens[idx + 1];
+
+        if (contentToken?.type === "inline") {
+            const direction = detectTextDirection(contentToken.content);
+
+            token.attrSet("dir", direction);
+            token.attrSet("style", `text-align: ${direction === "rtl" ? "right" : "left"}`);
+        }
+
+        return self.renderToken(tokens, idx, options);
+    };
+
+    instance.renderer.rules.blockquote_open = (tokens, idx, options, env, self) => {
+        const token = tokens[idx];
+        const inlineToken = tokens[idx + 2];
+
+        if (inlineToken?.type === "inline") {
+            token.attrSet("dir", detectTextDirection(inlineToken.content));
+        }
+
+        return self.renderToken(tokens, idx, options);
+    };
+
     lineNumberRendererRuleNames.forEach((ruleName) => {
+
+        const renderList = (tokens: any[], idx: number, options: any, env: any, self: any) => {
+            const token = tokens[idx];
+            let direction = "ltr";
+            for (let i = idx + 1; i < tokens.length; i++) {
+                if (tokens[i].type === "inline") {
+                    direction = detectTextDirection(tokens[i].content);
+                    break;
+                }
+
+                if (
+                    tokens[i].type === "bullet_list_close" ||
+                    tokens[i].type === "ordered_list_close"
+                ) {
+                    break;
+                }
+            }
+            token.attrSet("dir", direction);
+            return self.renderToken(tokens, idx, options);
+        };
+        instance.renderer.rules.bullet_list_open = renderList;
+        instance.renderer.rules.ordered_list_open = renderList;
+
+
         const original = instance.renderer.rules[ruleName];
 
         instance.renderer.rules[ruleName] = (tokens, idx, options, env, self) => {
